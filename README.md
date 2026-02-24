@@ -250,4 +250,227 @@ call.enqueue(new Callback<List<Proizvod>>() {
 });
 ```
 
+## Switch music play x time
+
+switch1.setOnCheckedChangeListener((buttonView, isChecked) -> {
+```java
+    if (isChecked) {
+
+        switch1.setEnabled(false);   // onemogući klik
+        playCount = 0;
+
+        mediaPlayer.start();
+
+        mediaPlayer.setOnCompletionListener(mp -> {
+
+            playCount++;
+
+            if (playCount < 3) {
+                mp.start();  // ponovo pusti
+            } else {
+
+                switch1.setChecked(false);   // prebaci na OFF
+                switch1.setEnabled(true);    // omogući ponovo
+            }
+        });
+    }
+});
+```
+
+
+
+
+
+##---------------------------------
+
+Odlično 🔥 ovo je ozbiljan kolokvijumski zadatak (Servis + Notifikacija + Action dugme).
+
+Radićemo sistematski i jasno.
+
+---
+
+# 🎯 ŠTA TREBA
+
+✔ Checkbox ON → pokreće Service
+✔ Service pušta muziku na repeat
+✔ Checkbox OFF → zaustavlja Service
+✔ Notifikacija ima dugme:
+
+* ako svira → piše **Pause**
+* ako je pauza → piše **Play**
+
+---
+
+# 🔥 1️⃣ Napravi Service klasu
+
+`New → Service → MusicService`
+
+## MusicService.java
+
+```java
+public class MusicService extends Service {
+
+    private MediaPlayer mediaPlayer;
+    private boolean isPlaying = false;
+
+    public static final String ACTION_TOGGLE = "ACTION_TOGGLE";
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        mediaPlayer = MediaPlayer.create(this, R.raw.music);
+        mediaPlayer.setLooping(true);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+
+        if (intent != null && ACTION_TOGGLE.equals(intent.getAction())) {
+            toggleMusic();
+        } else {
+            startMusic();
+        }
+
+        return START_STICKY;
+    }
+
+    private void startMusic() {
+        mediaPlayer.start();
+        isPlaying = true;
+        showNotification();
+    }
+
+    private void toggleMusic() {
+        if (isPlaying) {
+            mediaPlayer.pause();
+            isPlaying = false;
+        } else {
+            mediaPlayer.start();
+            isPlaying = true;
+        }
+        showNotification();
+    }
+
+    private void showNotification() {
+
+        String channelId = "music_channel";
+
+        NotificationManager manager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel =
+                    new NotificationChannel(channelId,
+                            "Music Channel",
+                            NotificationManager.IMPORTANCE_LOW);
+
+            manager.createNotificationChannel(channel);
+        }
+
+        Intent toggleIntent = new Intent(this, MusicService.class);
+        toggleIntent.setAction(ACTION_TOGGLE);
+
+        PendingIntent pendingIntent =
+                PendingIntent.getService(this, 0, toggleIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        String buttonText = isPlaying ? "Pause" : "Play";
+
+        Notification notification =
+                new NotificationCompat.Builder(this, channelId)
+                        .setContentTitle("Music Service")
+                        .setContentText("Melodija je aktivna")
+                        .setSmallIcon(android.R.drawable.ic_media_play)
+                        .addAction(0, buttonText, pendingIntent)
+                        .build();
+
+        startForeground(1, notification);
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mediaPlayer.release();
+    }
+}
+```
+
+---
+
+# 🔥 2️⃣ Dodaj Service u Manifest
+
+```xml
+<service
+    android:name=".MusicService"
+    android:exported="false"/>
+```
+
+---
+
+# 🔥 3️⃣ Checkbox u MainActivity
+
+```java
+CheckBox checkBox = findViewById(R.id.checkBox);
+
+checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+
+    Intent intent = new Intent(this, MusicService.class);
+
+    if (isChecked) {
+        startService(intent);
+    } else {
+        stopService(intent);
+    }
+});
+```
+
+---
+
+# 🧠 Kako ovo radi?
+
+* Checkbox ON → startService()
+* Service pušta muziku
+* Notifikacija se prikazuje (foreground service)
+* Klik na dugme u notifikaciji šalje ACTION_TOGGLE
+* Service pauzira ili nastavlja
+* Notifikacija menja tekst dugmeta
+
+---
+
+# 📌 Profesor proverava
+
+✔ Znaš šta je Service
+✔ Znaš Foreground service
+✔ Znaš NotificationChannel
+✔ Znaš PendingIntent
+✔ Znaš kako radi toggle logika
+
+---
+
+# ⚠ Ako ti app crashuje
+
+Dodaj u Manifest:
+
+```xml
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+```
+
+---
+
+# 🚀 Hoćeš sada naprednu verziju?
+
+Možemo dodati:
+
+* da notifikacija nestane kad se servis ugasi
+* ili da checkbox prati stanje servisa
+* ili da servis radi čak i kad izađeš iz aplikacije
+
+Ti biraš 😎
+
 
